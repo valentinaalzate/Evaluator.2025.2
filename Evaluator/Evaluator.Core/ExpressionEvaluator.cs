@@ -1,4 +1,6 @@
-﻿namespace Evaluator.Core;
+﻿using System.Globalization;
+
+namespace Evaluator.Core;
 
 public class ExpressionEvaluator
 {
@@ -12,48 +14,126 @@ public class ExpressionEvaluator
     {
         var stack = new Stack<char>();
         var postfix = string.Empty;
+        var numbers = string.Empty;
+
         foreach (char item in infix)
         {
-            if (IsOperator(item))
+            if ((item >= '0' && item <= '9') || item == '.')
             {
-                if (item == ')')
-                {
-                    do
-                    {
-                        postfix += stack.Pop();
-                    } while (stack.Peek() != '(');
-                    stack.Pop();
-                }
-                else
-                {
-                    if (stack.Count > 0)
-                    {
-                        if (PriorityInfix(item) > PriorityStack(stack.Peek()))
-                        {
-                            stack.Push(item);
-                        }
-                        else
-                        {
-                            postfix += stack.Pop();
-                            stack.Push(item);
-                        }
-                    }
-                    else
-                    {
-                        stack.Push(item);
-                    }
-                }
+                numbers += item;
             }
             else
             {
-                postfix += item;
+                if (numbers != string.Empty)
+                {
+                    postfix += numbers + " ";
+                    numbers = string.Empty;
+                }
+
+                if (IsOperator(item))
+                {
+                    if (item == ')')
+                    {
+                        do
+                        {
+                            postfix += stack.Pop() + " ";
+                        } while (stack.Peek() != '(');
+                        stack.Pop();
+                    }
+                    else
+                    {
+                        if (stack.Count > 0)
+                        {
+                            if (PriorityInfix(item) > PriorityStack(stack.Peek()))
+                            {
+                                stack.Push(item);
+                            }
+                            else
+                            {
+                                postfix += stack.Pop() + " ";
+                                stack.Push(item);
+                            }
+                        }
+                        else
+                        {
+                            stack.Push(item);
+                        }
+                    }
+                }
+                else if (item == '(')
+                {
+                    stack.Push(item);
+                }
+                
             }
         }
+
+        if (numbers != string.Empty)
+        {
+            postfix += numbers + " ";
+        }
+
         while (stack.Count > 0)
         {
-            postfix += stack.Pop();
+            var op = stack.Pop();
+           
+            postfix += op + " ";
         }
+
         return postfix;
+    }
+
+    public static double Calulate(string postfix)
+    {
+        var stack = new Stack<double>();
+        var numbers = string.Empty;
+
+        foreach (char item in postfix)
+        {
+            if ((item >= '0' && item <= '9') || item == '.')
+            {
+                numbers += item;
+            }
+            else if (item == ' ')
+            {
+                if (numbers != string.Empty)
+                {
+                    stack.Push(double.Parse(numbers, NumberStyles.Any, CultureInfo.InvariantCulture));
+                    numbers = string.Empty;
+                }
+            }
+            else if (IsOperator(item))
+            {
+                if (numbers != string.Empty)
+                {
+                    stack.Push(double.Parse(numbers, NumberStyles.Any, CultureInfo.InvariantCulture));
+                    numbers = string.Empty;
+                }
+
+                if (stack.Count < 2)
+                { throw new Exception("Insufficient operands."); 
+                
+                
+                }
+
+                var op2 = stack.Pop();
+                var op1 = stack.Pop();
+                stack.Push(Calulate(op1, item, op2));
+            }
+            
+        }
+
+        if (numbers != string.Empty)
+        {
+            stack.Push(double.Parse(numbers, NumberStyles.Any, CultureInfo.InvariantCulture));
+        }
+
+        if (stack.Count != 1)
+        {
+            throw new Exception("Invalid expression");
+        }
+
+        return stack.Peek();
     }
 
     private static bool IsOperator(char item) => item is '^' or '/' or '*' or '%' or '+' or '-' or '(' or ')';
@@ -76,25 +156,6 @@ public class ExpressionEvaluator
         _ => throw new Exception("Invalid expression."),
     };
 
-    private static double Calulate(string postfix)
-    {
-        var stack = new Stack<double>();
-        foreach (char item in postfix)
-        {
-            if (IsOperator(item))
-            {
-                var op2 = stack.Pop();
-                var op1 = stack.Pop();
-                stack.Push(Calulate(op1, item, op2));
-            }
-            else
-            {
-                stack.Push(Convert.ToDouble(item.ToString()));
-            }
-        }
-        return stack.Peek();
-    }
-
     private static double Calulate(double op1, char item, double op2) => item switch
     {
         '*' => op1 * op2,
@@ -102,6 +163,7 @@ public class ExpressionEvaluator
         '^' => Math.Pow(op1, op2),
         '+' => op1 + op2,
         '-' => op1 - op2,
+        '%' => op1 % op2,
         _ => throw new Exception("Invalid expression."),
     };
 }
